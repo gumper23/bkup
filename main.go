@@ -8,25 +8,42 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
+// go build -o bkup.exe -ldflags -H=windowsgui .
 func main() {
-	maxBackupFiles := 10
+	// Intended to be ran on a schedule of once every five minutes
+	// One hour's worth of backups
+	maxBackupFiles := 12
 
-	logf, err := os.OpenFile("c:\\users\\gumper\\documents\\bkup.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	// Usage: bkup.exe <file_to_be_backed_up>
+	if len(os.Args) != 2 {
+		printUsage()
+		os.Exit(1)
+	}
+
+	// Ensure the file to be backed up exists
+	if _, err := os.Stat(os.Args[1]); os.IsNotExist(err) {
+		log.Fatalf("Can't find [%s]: %v\n", os.Args[1], err)
+	}
+
+	// Create a log file in the directory of the file to be backed up
+	path, err := filepath.Abs(filepath.Dir(os.Args[1]))
+	if err != nil {
+		log.Fatalf("error determining path: [%v]\n", err)
+	}
+	logf, err := os.OpenFile(filepath.Join(path, "bkup.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
 	defer logf.Close()
 	log.SetOutput(logf)
 
-	if len(os.Args) != 2 {
-		printUsage()
-		os.Exit(1)
-	}
-
+	// Calculate the MD5 hash of the file
 	f, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
@@ -39,21 +56,35 @@ func main() {
 	}
 	f.Close()
 
-	files, err := filepath.Glob(os.Args[1] + "*")
+	// Search for existing backup files
+	files, err := filepath.Glob(os.Args[1] + ".*")
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Backup files are OTF: <file>.YYYYMMDDHHMMSS (14 digits)
+	restr := fmt.Sprintf("%s\\.[0-9]{14}$", strings.Replace(os.Args[1], `\`, `\\`, -1))
+	re, err := regexp.Compile(restr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var backups []string
+	for _, backup := range files {
+		if re.MatchString(backup) {
+			backups = append(backups, backup)
+		}
+	}
+
 	// Create a backup file if one doesn't exist.
-	if len(files) == 1 {
+	if len(backups) == 0 {
 		backupFile(os.Args[1])
 		os.Exit(0)
 	}
 
-	// Assume backup files exist OTF: <file>.<date>
 	// Compare the last file (most recent) to the argument.
-	sort.Strings(files)
-	lf, err := os.Open(files[len(files)-1])
+	sort.Strings(backups)
+	lf, err := os.Open(backups[len(backups)-1])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,8 +96,8 @@ func main() {
 	}
 	lf.Close()
 
-	// Do nothing if the file to be backed up and
-	// the most recent backup file contain the same data.
+	// Do nothing if the hashes of the argument and
+	// the most recent backup match
 	if reflect.DeepEqual(h, lh) {
 		os.Exit(0)
 	}
@@ -75,8 +106,8 @@ func main() {
 	backupFile(os.Args[1])
 
 	// Delete the oldest backup file if we are at max files.
-	if len(files) == maxBackupFiles+1 {
-		os.Remove(files[1])
+	if len(backups) == maxBackupFiles {
+		os.Remove(backups[0])
 	}
 }
 
