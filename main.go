@@ -15,6 +15,13 @@ import (
 func main() {
 	maxBackupFiles := 10
 
+	logf, err := os.OpenFile("c:\\users\\gumper\\documents\\bkup.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer logf.Close()
+	log.SetOutput(logf)
+
 	if len(os.Args) != 2 {
 		printUsage()
 		os.Exit(1)
@@ -74,7 +81,9 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Printf("Usage: %s <file_to_backup>\n", os.Args[0])
+	usage := fmt.Sprintf("Usage: %s <file_to_backup>\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, usage)
+	log.Printf(usage)
 }
 
 func backupFile(file string) error {
