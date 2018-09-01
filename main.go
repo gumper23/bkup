@@ -7,10 +7,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"time"
 )
 
 func main() {
+	maxBackupFiles := 10
+
 	if len(os.Args) != 2 {
 		printUsage()
 		os.Exit(1)
@@ -27,26 +31,45 @@ func main() {
 		log.Fatal(err)
 	}
 	f.Close()
-	fmt.Printf("%x\n", h.Sum(nil))
-
-	path := filepath.Dir(os.Args[1])
-	fmt.Printf("%s\n", path)
-
-	t := time.Now().Local()
-	fmt.Printf("%s\n", t.Format("20060102150405"))
 
 	files, err := filepath.Glob(os.Args[1] + "*")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, file := range files {
-		fmt.Printf("%s\n", file)
+	// Create a backup file if one doesn't exist.
+	if len(files) == 1 {
+		backupFile(os.Args[1])
+		os.Exit(0)
 	}
 
-	err = backupFile(os.Args[1])
+	// Assume backup files exist OTF: <file>.<date>
+	// Compare the last file (most recent) to the argument.
+	sort.Strings(files)
+	lf, err := os.Open(files[len(files)-1])
 	if err != nil {
 		log.Fatal(err)
+	}
+	defer lf.Close()
+
+	lh := md5.New()
+	if _, err := io.Copy(lh, lf); err != nil {
+		log.Fatal(err)
+	}
+	lf.Close()
+
+	// Do nothing if the file to be backed up and
+	// the most recent backup file contain the same data.
+	if reflect.DeepEqual(h, lh) {
+		os.Exit(0)
+	}
+
+	// Backup the file.
+	backupFile(os.Args[1])
+
+	// Delete the oldest backup file if we are at max files.
+	if len(files) == maxBackupFiles+1 {
+		os.Remove(files[1])
 	}
 }
 
