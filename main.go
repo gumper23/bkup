@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/md5"
 	"fmt"
 	"io"
@@ -82,7 +83,7 @@ func main() {
 	sort.Strings(backups)
 
 	// Do nothing if the file and most recent backup are the same.
-	same, err := fileMD5Compare(*file, backups[len(backups)-1])
+	same, err := CompareFiles(*file, backups[len(backups)-1])
 	if err != nil {
 		log.Fatalf("error comparing files %v", err)
 	}
@@ -106,12 +107,6 @@ func main() {
 		log.Printf("Deleted [%s]\n", backups[0])
 		return
 	}
-}
-
-func printUsage() {
-	usage := fmt.Sprintf("Usage: %s <file_to_backup>\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, usage)
-	log.Printf(usage)
 }
 
 func backupFile(file string) (dst string, err error) {
@@ -145,7 +140,8 @@ func backupFile(file string) (dst string, err error) {
 	return dst, out.Close()
 }
 
-func fileMD5Compare(file1, file2 string) (same bool, err error) {
+// CompareFilesMd5 uses MD5 hashing to compare file contents
+func CompareFilesMd5(file1, file2 string) (same bool, err error) {
 	f1, err := os.Open(file1)
 	if err != nil {
 		return false, err
@@ -171,4 +167,48 @@ func fileMD5Compare(file1, file2 string) (same bool, err error) {
 	same = reflect.DeepEqual(h1, h2)
 
 	return
+}
+
+// CompareFiles does a deep compare of files; returns true if they are identical
+func CompareFiles(file1, file2 string) (same bool, err error) {
+	// BufSize of 1 MB Chunks
+	const BufSize = 1024 * 1024
+
+	f1, err := os.Open(file1)
+	if err != nil {
+		return
+	}
+	defer f1.Close()
+
+	f2, err := os.Open(file2)
+	if err != nil {
+		return
+	}
+	defer f2.Close()
+
+	for {
+		b1 := make([]byte, BufSize)
+		_, err1 := f1.Read(b1)
+
+		b2 := make([]byte, BufSize)
+		_, err2 := f2.Read(b2)
+
+		if err1 != nil || err2 != nil {
+			// We're out of file to compare
+			if err1 == io.EOF && err2 == io.EOF {
+				return true, nil
+			} else if err1 == io.EOF || err2 == io.EOF {
+				return false, nil
+			} else {
+				if err1 != nil {
+					return false, err1
+				}
+				return false, err2
+			}
+		}
+
+		if !bytes.Equal(b1, b2) {
+			return false, err
+		}
+	}
 }
