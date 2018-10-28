@@ -30,23 +30,23 @@ func main() {
 
 	// Ensure the file to be backed up exists
 	if _, err := os.Stat(*file); os.IsNotExist(err) {
-		log.Fatalf("Can't find [%s]: %v\n", *file, err)
+		log.Fatalf("Can't find [%s]: %v\r\n", *file, err)
 	}
 
 	// Create a log file in the directory of the file to be backed up
 	path, err := filepath.Abs(filepath.Dir(*file))
 	if err != nil {
-		log.Fatalf("error determining path: [%v]\n", err)
+		log.Fatalf("error determining path: [%v]\r\n", err)
 	}
 	logf, err := os.OpenFile(filepath.Join(path, "bkup.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		log.Fatalf("error opening file: %v", err)
+		log.Fatalf("error opening file: %v\r\n", err)
 	}
 	defer logf.Close()
 	log.SetOutput(logf)
 
 	if *num <= 0 {
-		log.Fatalf("num [%d] must be greater than 0", *num)
+		log.Fatalf("num [%d] must be greater than 0\r\n", *num)
 	}
 
 	// Search for existing backup files
@@ -73,9 +73,9 @@ func main() {
 	if len(backups) == 0 {
 		dst, err := backupFile(*file)
 		if err != nil {
-			log.Fatalf("error backing up %s: %v\n", *file, err)
+			log.Fatalf("error backing up %s: %v\r\n", *file, err)
 		}
-		log.Printf("Copied [%s] to [%s]\n", *file, dst)
+		log.Printf("Copied [%s] to [%s]\r\n", *file, dst)
 		return
 	}
 
@@ -85,7 +85,7 @@ func main() {
 	// Do nothing if the file and most recent backup are the same.
 	same, err := CompareFiles(*file, backups[len(backups)-1])
 	if err != nil {
-		log.Fatalf("error comparing files %v", err)
+		log.Fatalf("error comparing files %v\r\n", err)
 	}
 	if same {
 		return
@@ -94,7 +94,7 @@ func main() {
 	// Backup the file.
 	dst, err := backupFile(*file)
 	if err != nil {
-		log.Fatalf("error backing up %s: %v", *file, err)
+		log.Fatalf("error backing up %s: %v\r\n", *file, err)
 	}
 	log.Printf("Copied [%s] to [%s]\n", *file, dst)
 
@@ -102,9 +102,9 @@ func main() {
 	if len(backups) >= *num {
 		err := os.Remove(backups[0])
 		if err != nil {
-			log.Fatalf("error deleting %s: %v\n", backups[0], err)
+			log.Fatalf("error deleting %s: %v\r\n", backups[0], err)
 		}
-		log.Printf("Deleted [%s]\n", backups[0])
+		log.Printf("Deleted [%s]\r\n", backups[0])
 		return
 	}
 }
