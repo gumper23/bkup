@@ -96,7 +96,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("error backing up %s: %v\r\n", *file, err)
 	}
-	log.Printf("Copied [%s] to [%s]\n", *file, dst)
+	log.Printf("Copied [%s] to [%s]\r\n", *file, dst)
 
 	// Delete the oldest backup file if we are at max files.
 	if len(backups) >= *num {
