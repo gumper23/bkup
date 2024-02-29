@@ -23,27 +23,21 @@ var (
 
 // go build -o bkup.exe -ldflags -H=windowsgui .
 func main() {
-	// Create a log file in the directory of the file(s) to be backed up
-	fmt.Println("HELLO - bkup.exe")
-	fmt.Printf("[%s]\n", *filespec)
-	fmt.Printf("[%s]\n", filepath.Dir(*filespec))
-	fmt.Printf("[%s]\n", filepath.Join(filepath.Dir(*filespec), "bkup.log"))
-	logf, err := os.OpenFile(filepath.Join(filepath.Dir(*filespec), "bkup.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v\r\n", err)
-	}
-	defer logf.Close()
-	log.SetOutput(logf)
-
 	// Usage: bkup.exe <file_to_be_backed_up> [-n <num_of_backups>]
 	// Validate parameters
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 	if *num <= 0 {
 		log.Fatalf("num [%d] must be greater than 0\r\n", *num)
 	}
-	if *filespec == "" {
-		log.Fatalf("file must be specified\r\n")
+
+	// Create a log file in the directory of the file(s) to be backed up
+	// and write to it.
+	logf, err := os.OpenFile(filepath.Join(filepath.Dir(*filespec), "bkup.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v\r\n", err)
 	}
+	defer logf.Close()
+	log.SetOutput(logf)
 
 	// Loop through the save game file names and back them up
 	savedGameFileNames, err := getSavedGameFileNames(*filespec)
@@ -71,14 +65,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("error comparing files %v\r\n", err)
 		}
-		if same {
-			continue
+		if !same {
+			dst, err := backupFile(file)
+			if err != nil {
+				log.Fatalf("error backing up %s: %v\r\n", file, err)
+			}
+			log.Printf("Copied [%s] to [%s]\r\n", file, dst)
 		}
-		dst, err := backupFile(file)
-		if err != nil {
-			log.Fatalf("error backing up %s: %v\r\n", file, err)
-		}
-		log.Printf("Copied [%s] to [%s]\r\n", file, dst)
 
 		// Delete the oldest backup file if we are at max files.
 		if len(backups) >= *num {
